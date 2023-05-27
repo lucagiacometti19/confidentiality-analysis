@@ -1,4 +1,4 @@
-module 0xCAFE::ExplicitFlow_Marketplace {
+module 0xCAFE::ImplicitFlow_Marketplace {
     use std::signer;
     use std::vector;
     use std::debug;
@@ -24,7 +24,7 @@ module 0xCAFE::ExplicitFlow_Marketplace {
         vector::push_back(&mut auction.bids, Bid {bidder: signer::address_of(account), value: bid});
     }
 
-    //Case 1 - explicit flow with callable public fun ?
+    //Implicit flow via conditionals
 
     fun maxBid(vec: &vector<Bid>) : u64 {
         let max = 0;
@@ -40,48 +40,30 @@ module 0xCAFE::ExplicitFlow_Marketplace {
         return max
     }
 
-    public fun getHighestBid(): u64 acquires Auction {
-        //get the vector of bids from the ADMIN address
-        let auction = borrow_global<Auction>(ADMIN);
-        return maxBid(&auction.bids)
-    }
-
-    //Case 2 - explicit flow with print
-
-    public fun bidWithExplicitFlow(account: &signer, bid: u64) acquires Auction {
+    public fun bidWithImplicitFlow(account: &signer, bid: u64) acquires Auction {
         let auction = borrow_global_mut<Auction>(ADMIN);
-        debug::print(&bid);
+        if (maxBid(&auction.bids) > bid) {
+            debug::print(&200);
+        } else {
+            debug::print(&400);
+        };
         vector::push_back(&mut auction.bids, Bid {bidder: signer::address_of(account), value: bid});
     }
 
     ///////////////////////////////       TESTS       ///////////////////////////////
 
     #[test(account = @0xCA11)]
-    fun test_bid(account: &signer) acquires Auction {
+    fun test_bidWithImplicitFlow(account: &signer) acquires Auction {
         //create initial state with empty auction
         move_to<Auction>(account, Auction { bids: vector::empty<Bid>() });
         //place a bid
-        bid(account, 55);
+        bidWithImplicitFlow(account, 55);
         //check that the bid has actually been registered in the auction
         let bids = &borrow_global<Auction>(signer::address_of(account)).bids;
         assert!(vector::contains<Bid>(bids, &Bid {bidder: signer::address_of(account), value: 55}), 0);
+        //place one bid lower than before, should print 400
+        bidWithImplicitFlow(account, 50);
+        //place one bid higher than before, should print 200
+        bidWithImplicitFlow(account, 60);
     }
-
-    #[test]
-    fun test_maxBid() {
-        let vec = vector[Bid { bidder: @0x11, value: 1 }, Bid { bidder: @0x12, value: 55 }, Bid { bidder: @0x13, value: 2 }];
-        let max = maxBid(&vec);
-        assert!(max == 55, 0);
-    }
-
-    #[test(account = @0xCA11)]
-    fun test_bidWithExplicitFlow(account: &signer) acquires Auction {
-        //create initial state with empty auction
-        move_to<Auction>(account, Auction { bids: vector::empty<Bid>() });
-        //place a bid
-        bidWithExplicitFlow(account, 55);
-        let bids = &borrow_global<Auction>(signer::address_of(account)).bids;
-        assert!(vector::contains<Bid>(bids, &Bid {bidder: signer::address_of(account), value: 55}), 0);
-    }
-
 }
